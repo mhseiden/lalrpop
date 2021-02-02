@@ -15,8 +15,8 @@ use crate::tls::Tls;
 use crate::tok;
 use atty;
 use lalrpop_util::ParseError;
+use termcolor::{ColorChoice, StandardStream};
 use tiny_keccak::Sha3;
-use term;
 
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
@@ -43,10 +43,10 @@ fn hash_file(file: &Path) -> io::Result<String> {
     let mut file = fs::File::open(&file)?;
     let mut file_bytes = Vec::new();
     file.read_to_end(&mut file_bytes).unwrap();
-    
+
     let mut sha3 = Sha3::v256();
     sha3.update(&file_bytes);
-    
+
     let mut output = [0u8; 32];
     sha3.finalize(&mut output);
 
@@ -297,7 +297,7 @@ fn report_error(file_text: &FileText, span: pt::Span, message: &str) -> ! {
     exit(1);
 }
 
-fn report_messages(messages: Vec<Message>) -> term::Result<()> {
+fn report_messages(messages: Vec<Message>) -> io::Result<()> {
     let builder = InlineBuilder::new().begin_paragraphs();
     let builder = messages
         .into_iter()
@@ -306,7 +306,7 @@ fn report_messages(messages: Vec<Message>) -> term::Result<()> {
     report_content(&*content)
 }
 
-fn report_content(content: &dyn Content) -> term::Result<()> {
+fn report_content(content: &dyn Content) -> io::Result<()> {
     // FIXME -- can we query the size of the terminal somehow?
     let canvas = content.emit_to_canvas(80);
 
@@ -317,9 +317,8 @@ fn report_content(content: &dyn Content) -> term::Result<()> {
     };
 
     if try_colors {
-        if let Some(mut stdout) = term::stdout() {
-            return canvas.write_to(&mut *stdout);
-        }
+        let mut stdout = StandardStream::stdout(ColorChoice::Always);
+        return canvas.write_to(&mut stdout);
     }
 
     let stdout = io::stdout();
